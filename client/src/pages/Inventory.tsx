@@ -1,11 +1,15 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ItemCard from "@/components/ItemCard";
 import VoiceButton from "@/components/VoiceButton";
 import VoiceStatus from "@/components/VoiceStatus";
+import EditPriceDialog from "@/components/EditPriceDialog";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Item } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -13,23 +17,46 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-interface Item {
-  id: string;
-  name: string;
-  price: number;
-}
-
 export default function Inventory() {
-  const [items, setItems] = useState<Item[]>([
-    { id: "1", name: "టమాటా", price: 40 },
-    { id: "2", name: "ఉల్లిపాయలు", price: 30 },
-    { id: "3", name: "బంగాళాదుంప", price: 25 },
-  ]);
+  const { data: items = [], isLoading } = useQuery<Item[]>({
+    queryKey: ["/api/items"],
+  });
+  
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "processing" | "success">("idle");
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const { toast } = useToast();
+
+  const addItemMutation = useMutation({
+    mutationFn: async (data: { name: string; price: number }) => {
+      return await apiRequest("POST", "/api/items", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      setNewItemName("");
+      setNewItemPrice("");
+      setShowAddDialog(false);
+      toast({
+        title: "విజయవంతం",
+        description: "వస్తువు జాబితాకు చేర్చబడింది",
+      });
+    },
+  });
+
+  const updatePriceMutation = useMutation({
+    mutationFn: async ({ id, price }: { id: string; price: number }) => {
+      return await apiRequest("PATCH", `/api/items/${id}`, { price });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      toast({
+        title: "విజయవంతం",
+        description: "ధర మార్చబడింది",
+      });
+    },
+  });
 
   const { isListening, transcript, startListening, stopListening, isSupported } = useSpeechRecognition({
     language: "te-IN",
@@ -42,7 +69,7 @@ export default function Inventory() {
         setTimeout(() => setVoiceStatus("idle"), 1000);
       }, 500);
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "వాయిస్ లోపం",
         description: "దయచేసి మళ్ళీ ప్రయత్నించండి",
@@ -73,22 +100,27 @@ export default function Inventory() {
     }
 
     const price = parseFloat(newItemPrice) || 0;
-    const newItem: Item = {
-      id: Date.now().toString(),
-      name: newItemName.trim(),
-      price,
-    };
-
-    setItems([...items, newItem]);
-    setNewItemName("");
-    setNewItemPrice("");
-    setShowAddDialog(false);
-    
-    toast({
-      title: "విజయవంతం",
-      description: `${newItem.name} జాబితాకు చేర్చబడింది`,
-    });
+    addItemMutation.mutate({ name: newItemName.trim(), price });
   };
+
+  const handleEditPrice = (item: Item) => {
+    setEditingItem(item);
+  };
+
+  const handleSavePrice = (price: number) => {
+    if (editingItem) {
+      updatePriceMutation.mutate({ id: editingItem.id, price });
+      setEditingItem(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+        <div className="text-muted-foreground">లోడ్ అవుతోంది...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
@@ -102,8 +134,18 @@ export default function Inventory() {
 
         <div className="space-y-3">
           {items.map((item) => (
-            <ItemCard key={item.id} name={item.name} price={item.price} />
+            <ItemCard
+              key={item.id}
+              name={item.name}
+              price={item.price}
+              onEditPrice={() => handleEditPrice(item)}
+            />
           ))}
+          {items.length === 0 && (
+            <div className="text-center text-muted-foreground py-8">
+              వస్తువులు లేవు. కొత్త వస్తువు చేర్చండి.
+            </div>
+          )}
         </div>
 
         <Button
@@ -161,13 +203,24 @@ export default function Inventory() {
                 className="w-full h-12"
                 onClick={handleAddItem}
                 data-testid="button-confirm-add"
+                disabled={addItemMutation.isPending}
               >
-                చేర్చండి
+                {addItemMutation.isPending ? "చేర్చబడుతోంది..." : "చేర్చండి"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {editingItem && (
+        <EditPriceDialog
+          open={!!editingItem}
+          onOpenChange={(open) => !open && setEditingItem(null)}
+          itemName={editingItem.name}
+          currentPrice={editingItem.price}
+          onSave={handleSavePrice}
+        />
+      )}
     </div>
   );
 }

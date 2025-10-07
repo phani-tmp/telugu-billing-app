@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ItemCardProps {
@@ -8,9 +9,10 @@ interface ItemCardProps {
   price?: number;
   isSelected?: boolean;
   onClick?: () => void;
+  onEditPrice?: () => void;
 }
 
-export default function ItemCard({ name, price, isSelected, onClick }: ItemCardProps) {
+export default function ItemCard({ name, price, isSelected, onClick, onEditPrice }: ItemCardProps) {
   return (
     <Card
       data-testid={`card-item-${name}`}
@@ -27,11 +29,27 @@ export default function ItemCard({ name, price, isSelected, onClick }: ItemCardP
             {name}
           </span>
         </div>
-        {price !== undefined && price > 0 && (
-          <Badge variant="secondary" className="font-mono flex-shrink-0">
-            ₹{price}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {price !== undefined && price >= 0 && (
+            <Badge variant="secondary" className="font-mono">
+              ₹{price}
+            </Badge>
+          )}
+          {onEditPrice && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              data-testid={`button-edit-price-${name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditPrice();
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );

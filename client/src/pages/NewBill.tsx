@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import ItemCard from "@/components/ItemCard";
 import QuantityInput from "@/components/QuantityInput";
@@ -7,6 +8,8 @@ import VoiceStatus from "@/components/VoiceStatus";
 import BillDisplay from "@/components/BillDisplay";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Item, BillItem } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -15,33 +18,35 @@ import {
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 
-interface Item {
-  id: string;
-  name: string;
-  price: number;
-}
-
-interface BillItem {
-  itemName: string;
-  quantity: number;
-  price: number;
-  total: number;
-}
-
 export default function NewBill() {
   const [, setLocation] = useLocation();
-  const [items] = useState<Item[]>([
-    { id: "1", name: "టమాటా", price: 40 },
-    { id: "2", name: "ఉల్లిపాయలు", price: 30 },
-    { id: "3", name: "బంగాళాదుంప", price: 25 },
-  ]);
+  const { data: items = [] } = useQuery<Item[]>({
+    queryKey: ["/api/items"],
+  });
+  
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [quantity, setQuantity] = useState(0.25);
+  const [billItems, setBillItems] = useState<Omit<BillItem, "id" | "billId">[]>([]);
   const [showQuantityDialog, setShowQuantityDialog] = useState(false);
   const [showBillDialog, setShowBillDialog] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "processing" | "success">("idle");
   const { toast } = useToast();
+
+  const saveBillMutation = useMutation({
+    mutationFn: async (data: { bill: { billNumber: string; totalAmount: number }; items: any[] }) => {
+      return await apiRequest("POST", "/api/bills", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      setBillItems([]);
+      setShowBillDialog(false);
+      toast({
+        title: "బిల్లు సేవ్ అయింది",
+        description: "మీ బిల్లు విజయవంతంగా సేవ్ చేయబడింది",
+      });
+      setLocation("/history");
+    },
+  });
 
   const { isListening, transcript, startListening, stopListening, isSupported } = useSpeechRecognition({
     language: "te-IN",
@@ -76,7 +81,7 @@ export default function NewBill() {
 
   const handleItemClick = (item: Item) => {
     setSelectedItem(item);
-    setQuantity(1);
+    setQuantity(0.25);
     setShowQuantityDialog(true);
   };
 
@@ -94,7 +99,8 @@ export default function NewBill() {
     if (!selectedItem || quantity <= 0) return;
 
     const total = quantity * selectedItem.price;
-    const newBillItem: BillItem = {
+    const newBillItem = {
+      itemId: selectedItem.id,
       itemName: selectedItem.name,
       quantity,
       price: selectedItem.price,
@@ -104,7 +110,7 @@ export default function NewBill() {
     setBillItems([...billItems, newBillItem]);
     setShowQuantityDialog(false);
     setSelectedItem(null);
-    setQuantity(1);
+    setQuantity(0.25);
 
     toast({
       title: "చేర్చబడింది",
@@ -125,13 +131,13 @@ export default function NewBill() {
   };
 
   const handleSaveBill = () => {
-    toast({
-      title: "బిల్లు సేవ్ అయింది",
-      description: "మీ బిల్లు విజయవంతంగా సేవ్ చేయబడింది",
+    const billNumber = `B${Date.now().toString().slice(-6)}`;
+    const totalAmount = billItems.reduce((sum, item) => sum + item.total, 0);
+    
+    saveBillMutation.mutate({
+      bill: { billNumber, totalAmount },
+      items: billItems,
     });
-    setBillItems([]);
-    setShowBillDialog(false);
-    setLocation("/history");
   };
 
   const totalAmount = billItems.reduce((sum, item) => sum + item.total, 0);
@@ -164,6 +170,11 @@ export default function NewBill() {
               onClick={() => handleItemClick(item)}
             />
           ))}
+          {items.length === 0 && (
+            <div className="text-center text-muted-foreground py-8">
+              వస్తువులు లేవు. ముందుగా వస్తువులు చేర్చండి.
+            </div>
+          )}
         </div>
 
         <Button

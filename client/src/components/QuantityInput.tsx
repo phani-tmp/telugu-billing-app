@@ -17,7 +17,7 @@ export default function QuantityInput({ value, onChange, unit = "కేజీల
     <div className="space-y-4">
       <div className="text-center">
         <div className="text-4xl font-bold font-mono mb-2" data-testid="text-quantity-value">
-          {value.toFixed(1)}
+          {value.toFixed(2)}
         </div>
         <div className="text-sm text-muted-foreground">{unit}</div>
       </div>
@@ -27,7 +27,7 @@ export default function QuantityInput({ value, onChange, unit = "కేజీల
           size="icon"
           variant="outline"
           data-testid="button-decrease"
-          onClick={() => handleIncrement(-0.5)}
+          onClick={() => handleIncrement(-0.25)}
           disabled={value <= 0}
         >
           <Minus className="h-4 w-4" />
@@ -38,21 +38,21 @@ export default function QuantityInput({ value, onChange, unit = "కేజీల
           onChange={(e) => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
           className="text-center text-xl font-mono"
           data-testid="input-quantity"
-          step="0.5"
+          step="0.25"
           min="0"
         />
         <Button
           size="icon"
           variant="outline"
           data-testid="button-increase"
-          onClick={() => handleIncrement(0.5)}
+          onClick={() => handleIncrement(0.25)}
         >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        {[0.5, 1, 5, 10].map((amount) => (
+        {[0.25, 0.5, 1, 5].map((amount) => (
           <Button
             key={amount}
             variant="secondary"

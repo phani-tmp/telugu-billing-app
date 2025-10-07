@@ -1,55 +1,49 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { FileText } from "lucide-react";
+import { FileText, Calendar } from "lucide-react";
 import BillDisplay from "@/components/BillDisplay";
+import type { Bill, BillItem } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-
-interface Bill {
-  id: string;
-  billNumber: string;
-  totalAmount: number;
-  itemCount: number;
-  createdAt: Date;
-  items: Array<{
-    itemName: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }>;
-}
+import { Input } from "@/components/ui/input";
 
 export default function History() {
-  const [bills] = useState<Bill[]>([
-    {
-      id: "1",
-      billNumber: "B001234",
-      totalAmount: 205,
-      itemCount: 3,
-      createdAt: new Date(2024, 0, 7, 10, 30),
-      items: [
-        { itemName: "టమాటా", quantity: 2.5, price: 40, total: 100 },
-        { itemName: "ఉల్లిపాయలు", quantity: 1, price: 30, total: 30 },
-        { itemName: "బంగాళాదుంప", quantity: 3, price: 25, total: 75 },
-      ],
-    },
-    {
-      id: "2",
-      billNumber: "B001235",
-      totalAmount: 120,
-      itemCount: 2,
-      createdAt: new Date(2024, 0, 7, 11, 45),
-      items: [
-        { itemName: "టమాటా", quantity: 1, price: 40, total: 40 },
-        { itemName: "బంగాళాదుంప", quantity: 2, price: 40, total: 80 },
-      ],
-    },
-  ]);
+  const [selectedDate, setSelectedDate] = useState("");
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  
+  const { data: bills = [] } = useQuery<Bill[]>({
+    queryKey: ["/api/bills", selectedDate],
+    queryFn: async () => {
+      const url = selectedDate ? `/api/bills?date=${selectedDate}` : "/api/bills";
+      const response = await fetch(url);
+      return response.json();
+    },
+  });
+
+  const { data: billItems = [] } = useQuery<BillItem[]>({
+    queryKey: ["/api/bills", selectedBill?.id, "items"],
+    enabled: !!selectedBill?.id,
+    queryFn: async () => {
+      const response = await fetch(`/api/bills/${selectedBill?.id}/items`);
+      return response.json();
+    },
+  });
+
+  const { data: dailyTotalData } = useQuery<{ total: number }>({
+    queryKey: ["/api/daily-total", selectedDate],
+    enabled: !!selectedDate,
+    queryFn: async () => {
+      const response = await fetch(`/api/daily-total/${selectedDate}`);
+      return response.json();
+    },
+  });
+
+  const totalAmount = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
@@ -59,6 +53,39 @@ export default function History() {
           <p className="text-sm text-muted-foreground">
             మునుపటి బిల్లులను చూడండి
           </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              data-testid="input-date-filter"
+              className="flex-1"
+            />
+          </div>
+
+          {selectedDate && dailyTotalData && (
+            <div className="bg-primary/10 p-4 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">రోజు మొత్తం వ్యాపారం</span>
+                <span className="font-mono font-bold text-2xl text-primary">
+                  ₹{dailyTotalData.total.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!selectedDate && bills.length > 0 && (
+            <div className="bg-primary/10 p-4 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">మొత్తం బిల్లులు: {bills.length}</span>
+                <span className="font-mono font-bold text-lg">₹{totalAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -79,19 +106,21 @@ export default function History() {
                       #{bill.billNumber}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {format(bill.createdAt, "dd/MM/yyyy hh:mm a")}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {bill.itemCount} వస్తువులు
+                      {format(new Date(bill.createdAt), "dd/MM/yyyy hh:mm a")}
                     </div>
                   </div>
                 </div>
                 <Badge variant="secondary" className="font-mono text-base flex-shrink-0">
-                  ₹{bill.totalAmount}
+                  ₹{bill.totalAmount.toFixed(2)}
                 </Badge>
               </div>
             </Card>
           ))}
+          {bills.length === 0 && (
+            <div className="text-center text-muted-foreground py-8">
+              {selectedDate ? "ఈ తేదీకి బిల్లులు లేవు" : "బిల్లులు లేవు"}
+            </div>
+          )}
         </div>
       </div>
 
@@ -100,9 +129,9 @@ export default function History() {
           {selectedBill && (
             <BillDisplay
               billNumber={selectedBill.billNumber}
-              items={selectedBill.items}
+              items={billItems}
               totalAmount={selectedBill.totalAmount}
-              createdAt={selectedBill.createdAt}
+              createdAt={new Date(selectedBill.createdAt)}
               onShare={() => console.log("Share")}
               onPrint={() => console.log("Print")}
               onSave={() => console.log("Save")}
