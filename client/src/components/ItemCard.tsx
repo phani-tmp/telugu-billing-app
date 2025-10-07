@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Pencil } from "lucide-react";
+import { Package, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ItemCardProps {
@@ -10,9 +10,10 @@ interface ItemCardProps {
   isSelected?: boolean;
   onClick?: () => void;
   onEditPrice?: () => void;
+  onDelete?: () => void;
 }
 
-export default function ItemCard({ name, price, isSelected, onClick, onEditPrice }: ItemCardProps) {
+export default function ItemCard({ name, price, isSelected, onClick, onEditPrice, onDelete }: ItemCardProps) {
   return (
     <Card
       data-testid={`card-item-${name}`}
@@ -47,6 +48,20 @@ export default function ItemCard({ name, price, isSelected, onClick, onEditPrice
               }}
             >
               <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              data-testid={`button-delete-item-${name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
         </div>

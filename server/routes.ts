@@ -34,6 +34,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/items/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteItem(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete item" });
+    }
+  });
+
   app.get("/api/bills", async (req, res) => {
     try {
       const date = req.query.date as string | undefined;

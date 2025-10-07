@@ -58,6 +58,19 @@ export default function Inventory() {
     },
   });
 
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/items/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      toast({
+        title: "తొలగించబడింది",
+        description: "వస్తువు విజయవంతంగా తొలగించబడింది",
+      });
+    },
+  });
+
   const { isListening, transcript, startListening, stopListening, isSupported } = useSpeechRecognition({
     language: "te-IN",
     onResult: (result) => {
@@ -114,6 +127,12 @@ export default function Inventory() {
     }
   };
 
+  const handleDeleteItem = (item: Item) => {
+    if (window.confirm(`${item.name} ను తొలగించాలా?`)) {
+      deleteItemMutation.mutate(item.id);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
@@ -139,6 +158,7 @@ export default function Inventory() {
               name={item.name}
               price={item.price}
               onEditPrice={() => handleEditPrice(item)}
+              onDelete={() => handleDeleteItem(item)}
             />
           ))}
           {items.length === 0 && (

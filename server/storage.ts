@@ -7,6 +7,7 @@ export interface IStorage {
   getItem(id: string): Promise<Item | undefined>;
   createItem(item: InsertItem): Promise<Item>;
   updateItem(id: string, item: Partial<InsertItem>): Promise<Item>;
+  deleteItem(id: string): Promise<void>;
   
   getBills(date?: string): Promise<Bill[]>;
   getBill(id: string): Promise<Bill | undefined>;
@@ -40,6 +41,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(items.id, id))
       .returning();
     return item;
+  }
+
+  async deleteItem(id: string): Promise<void> {
+    await db.delete(items).where(eq(items.id, id));
   }
 
   async getBills(date?: string): Promise<Bill[]> {
