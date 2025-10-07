@@ -327,28 +327,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 1. Validate all parts before attempting any DB write
       const billData = insertBillSchema.parse(bill);
-      // NOTE: Using 'parse' here will throw if item data is invalid, preventing transaction start
       const billItemsData = items.map((item: unknown) => insertBillItemSchema.partial().parse(item));
 
       // 2. Execute the entire save operation atomically using Drizzle's transaction method
       const createdBill = await db.transaction(async (tx) => {
 
-        // Use the transactional client 'tx' for all database operations inside this block
-
-        // NOTE: Fix is applied here by importing billsSchema directly.
+        // NOTE: Fix is applied here by importing billsSchema/billItemsSchema directly.
         const [createdBillRecord] = await tx
-          .insert(billsSchema) // FIXED: Using imported billsSchema
+          .insert(billsSchema)
           .values(billData)
           .returning();
 
         if (!createdBillRecord) {
-          throw new Error("Failed to create bill record.");
+          // This should only happen if the DB is truly broken
+          throw new Error("Transaction: Failed to return bill ID.");
         }
 
         // 2b. Create all bill item records
         for (const item of billItemsData) {
           await tx
-            .insert(billItemsSchema) // FIXED: Using imported billItemsSchema
+            .insert(billItemsSchema)
             .values({
               ...item,
               billId: createdBillRecord.id, // Link items to the new bill ID
@@ -358,13 +356,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return createdBillRecord;
       });
 
-      console.log(`POST /api/bills: Successfully created bill ID: ${createdBill.id}`);
+      console.log(`POST /api/bills: SUCCESS - Bill ID: ${createdBill.id} created.`);
       res.json(createdBill);
 
     } catch (error) {
-      console.error("POST /api/bills error (Transaction Failed):", error);
-      // The error is likely a missing database function or schema access issue
-      res.status(500).json({ error: "Failed to save bill: Database transaction failed." });
+      // If we reach this, the error occurred during validation, DB transaction, or commit.
+      console.error("POST /api/bills ERROR: Database or Validation Failure:", error);
+      // We return a 500 error since the failure is likely internal (database/schema logic)
+      res.status(500).json({ error: "Failed to save bill: Internal database transaction failure." });
     }
   });
 
