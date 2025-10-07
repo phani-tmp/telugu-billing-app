@@ -18,6 +18,7 @@ A mobile-first voice-enabled billing application for shops in Telugu language us
 - Changed minimum quantity from 0.5kg to 0.25kg
 - Fixed query invalidation for daily totals after bill creation
 - Added PATCH request validation for item price updates
+- Added item deletion functionality with confirmation dialog
 
 ## Project Architecture
 
