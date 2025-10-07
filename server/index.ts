@@ -139,6 +139,6 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0", // <-- FIXED: Using local loopback address
   }, () => {
-    log(`serving on http://127.0.0.1:${port}`);
+    log(`serving on http://0.0.0.0:${port}`);
   });
 })();
