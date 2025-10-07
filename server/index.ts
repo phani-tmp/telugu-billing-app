@@ -132,13 +132,20 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // We change the host from '0.0.0.0' (Replit/Cloud setting) to '127.0.0.1' 
   // to avoid ENOTSUP errors on local macOS environments.
-  const port = parseInt(process.env.PORT || '5000', 10);
 
-  // NOTE: Removed 'reusePort: true' as it can sometimes cause issues.
-  server.listen({
-    port,
-    host: "0.0.0.0", // <-- FIXED: Using local loopback address
-  }, () => {
-    log(`serving on http://0.0.0.0:${port}`);
+  const port = process.env.PORT || 10000;
+
+  server.listen(port, () => {
+    // Use console.log for startup messages to ensure they always appear.
+    console.log(`[server] Server is running on port ${port}`);
   });
+  //   const port = parseInt(process.env.PORT || '5000', 10);
+
+  //   // NOTE: Removed 'reusePort: true' as it can sometimes cause issues.
+  //   server.listen({
+  //     port,
+  //     host: "0.0.0.0", // <-- FIXED: Using local loopback address
+  //   }, () => {
+  //     log(`serving on http://0.0.0.0:${port}`);
+  //   });
 })();
