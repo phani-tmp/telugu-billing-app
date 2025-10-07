@@ -137,7 +137,7 @@ app.use((req, res, next) => {
   // NOTE: Removed 'reusePort: true' as it can sometimes cause issues.
   server.listen({
     port,
-    host: "127.0.0.1", // <-- FIXED: Using local loopback address
+    host: "0.0.0.0", // <-- FIXED: Using local loopback address
   }, () => {
     log(`serving on http://127.0.0.1:${port}`);
   });
