@@ -321,51 +321,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/bills (CREATE BILL - CRITICAL FIX: TRANSACTION LOGIC)
+  // Inside server/routes.ts
+
   app.post(BILL_ROUTE_BASE, async (req, res) => {
+    console.log("POST /api/bills: Request received."); // <-- CHECKPOINT 1
     try {
       const { bill, items } = req.body;
 
-      // 1. Validate all parts before attempting any DB write
       const billData = insertBillSchema.parse(bill);
       const billItemsData = items.map((item: unknown) => insertBillItemSchema.partial().parse(item));
 
-      // 2. Execute the entire save operation atomically using Drizzle's transaction method
-      const createdBill = await db.transaction(async (tx) => {
+      console.log("POST /api/bills: Data parsed successfully. Starting transaction."); // <-- CHECKPOINT 2
 
-        // NOTE: Fix is applied here by importing billsSchema/billItemsSchema directly.
+      const createdBill = await db.transaction(async (tx) => {
+        console.log("--> CHECKPOINT 3: Inside transaction block.");
+
         const [createdBillRecord] = await tx
           .insert(billsSchema)
           .values(billData)
           .returning();
 
+        console.log(`--> CHECKPOINT 4: Bill record created in transaction. ID is: ${createdBillRecord?.id}`);
+
         if (!createdBillRecord) {
-          // This should only happen if the DB is truly broken
-          throw new Error("Transaction: Failed to return bill ID.");
+          console.error("--> FATAL: Bill record was not returned. Throwing error.");
+          throw new Error("Transaction: Failed to return bill ID after insert.");
         }
 
-        // 2b. Create all bill item records
         for (const item of billItemsData) {
+          console.log(`--> CHECKPOINT 5: Inserting item for bill ID: ${createdBillRecord.id}`);
           await tx
             .insert(billItemsSchema)
             .values({
               ...item,
-              billId: createdBillRecord.id, // Link items to the new bill ID
+              billId: createdBillRecord.id,
             });
         }
 
+        console.log("--> CHECKPOINT 6: All items inserted. Returning from transaction function.");
         return createdBillRecord;
       });
 
-      console.log(`POST /api/bills: SUCCESS - Bill ID: ${createdBill.id} created.`);
+      console.log(`POST /api/bills: SUCCESS! Transaction complete. Bill ID: ${createdBill.id}`);
       res.json(createdBill);
 
     } catch (error) {
-      // If we reach this, the error occurred during validation, DB transaction, or commit.
-      console.error("POST /api/bills ERROR: Database or Validation Failure:", error);
-      // We return a 500 error since the failure is likely internal (database/schema logic)
+      // If anything goes wrong, we'll see this detailed log
+      console.error("POST /api/bills CATCH BLOCK ERROR:", error);
       res.status(500).json({ error: "Failed to save bill: Internal database transaction failure." });
     }
   });
+  // app.post(BILL_ROUTE_BASE, async (req, res) => {
+  //   try {
+  //     const { bill, items } = req.body;
+
+  //     // 1. Validate all parts before attempting any DB write
+  //     const billData = insertBillSchema.parse(bill);
+  //     const billItemsData = items.map((item: unknown) => insertBillItemSchema.partial().parse(item));
+
+  //     // 2. Execute the entire save operation atomically using Drizzle's transaction method
+  //     const createdBill = await db.transaction(async (tx) => {
+
+  //       // NOTE: Fix is applied here by importing billsSchema/billItemsSchema directly.
+  //       const [createdBillRecord] = await tx
+  //         .insert(billsSchema)
+  //         .values(billData)
+  //         .returning();
+
+  //       if (!createdBillRecord) {
+  //         // This should only happen if the DB is truly broken
+  //         throw new Error("Transaction: Failed to return bill ID.");
+  //       }
+
+  //       // 2b. Create all bill item records
+  //       for (const item of billItemsData) {
+  //         await tx
+  //           .insert(billItemsSchema)
+  //           .values({
+  //             ...item,
+  //             billId: createdBillRecord.id, // Link items to the new bill ID
+  //           });
+  //       }
+
+  //       return createdBillRecord;
+  //     });
+
+  //     console.log(`POST /api/bills: SUCCESS - Bill ID: ${createdBill.id} created.`);
+  //     res.json(createdBill);
+
+  //   } catch (error) {
+  //     // If we reach this, the error occurred during validation, DB transaction, or commit.
+  //     console.error("POST /api/bills ERROR: Database or Validation Failure:", error);
+  //     // We return a 500 error since the failure is likely internal (database/schema logic)
+  //     res.status(500).json({ error: "Failed to save bill: Internal database transaction failure." });
+  //   }
+  // });
 
   app.get("/api/daily-total/:date", async (req, res) => {
     try {
