@@ -26,7 +26,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/items/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const item = await storage.updateItem(id, req.body);
+      const data = insertItemSchema.partial().parse(req.body);
+      const item = await storage.updateItem(id, data);
       res.json(item);
     } catch (error) {
       res.status(400).json({ error: "Failed to update item" });

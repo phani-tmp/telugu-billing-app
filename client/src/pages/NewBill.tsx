@@ -38,6 +38,7 @@ export default function NewBill() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-total"] });
       setBillItems([]);
       setShowBillDialog(false);
       toast({
