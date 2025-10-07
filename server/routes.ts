@@ -241,7 +241,7 @@ import { insertItemSchema, insertBillSchema, insertBillItemSchema, items as item
 // 1. /api/items (The correct path)
 // 2. /api/api/items (The path seen in your logs)
 const ITEM_ROUTE_BASE = "/api(?:/api)?/items";
-const BILL_ROUTE_BASE = "/api/bills";
+const BILL_ROUTE_BASE = "/api(?:/api)?/bills";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // --- ITEM ROUTES ---
