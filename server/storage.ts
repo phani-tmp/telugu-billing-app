@@ -1,74 +1,84 @@
-import { type Item, type InsertItem, type Bill, type InsertBill, type BillItem, type InsertBillItem } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { items, bills, billItems, type Item, type InsertItem, type Bill, type InsertBill, type BillItem, type InsertBillItem } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getItems(): Promise<Item[]>;
   getItem(id: string): Promise<Item | undefined>;
   createItem(item: InsertItem): Promise<Item>;
+  updateItem(id: string, item: Partial<InsertItem>): Promise<Item>;
   
-  getBills(): Promise<Bill[]>;
+  getBills(date?: string): Promise<Bill[]>;
   getBill(id: string): Promise<Bill | undefined>;
   createBill(bill: InsertBill): Promise<Bill>;
   
   getBillItems(billId: string): Promise<BillItem[]>;
   createBillItem(billItem: InsertBillItem): Promise<BillItem>;
+  
+  getDailyTotal(date: string): Promise<number>;
 }
 
-export class MemStorage implements IStorage {
-  private items: Map<string, Item>;
-  private bills: Map<string, Bill>;
-  private billItems: Map<string, BillItem>;
-
-  constructor() {
-    this.items = new Map();
-    this.bills = new Map();
-    this.billItems = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getItems(): Promise<Item[]> {
-    return Array.from(this.items.values());
+    return await db.select().from(items).orderBy(items.name);
   }
 
   async getItem(id: string): Promise<Item | undefined> {
-    return this.items.get(id);
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item || undefined;
   }
 
   async createItem(insertItem: InsertItem): Promise<Item> {
-    const id = randomUUID();
-    const item: Item = { id, name: insertItem.name, price: insertItem.price ?? 0 };
-    this.items.set(id, item);
+    const [item] = await db.insert(items).values(insertItem).returning();
     return item;
   }
 
-  async getBills(): Promise<Bill[]> {
-    return Array.from(this.bills.values()).sort((a, b) => 
-      b.createdAt.getTime() - a.createdAt.getTime()
-    );
+  async updateItem(id: string, updateData: Partial<InsertItem>): Promise<Item> {
+    const [item] = await db
+      .update(items)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(items.id, id))
+      .returning();
+    return item;
+  }
+
+  async getBills(date?: string): Promise<Bill[]> {
+    if (date) {
+      return await db
+        .select()
+        .from(bills)
+        .where(eq(bills.billDate, date))
+        .orderBy(desc(bills.createdAt));
+    }
+    return await db.select().from(bills).orderBy(desc(bills.createdAt));
   }
 
   async getBill(id: string): Promise<Bill | undefined> {
-    return this.bills.get(id);
+    const [bill] = await db.select().from(bills).where(eq(bills.id, id));
+    return bill || undefined;
   }
 
   async createBill(insertBill: InsertBill): Promise<Bill> {
-    const id = randomUUID();
-    const bill: Bill = { ...insertBill, id, createdAt: new Date() };
-    this.bills.set(id, bill);
+    const [bill] = await db.insert(bills).values(insertBill).returning();
     return bill;
   }
 
   async getBillItems(billId: string): Promise<BillItem[]> {
-    return Array.from(this.billItems.values()).filter(
-      (item) => item.billId === billId
-    );
+    return await db.select().from(billItems).where(eq(billItems.billId, billId));
   }
 
   async createBillItem(insertBillItem: InsertBillItem): Promise<BillItem> {
-    const id = randomUUID();
-    const billItem: BillItem = { ...insertBillItem, id };
-    this.billItems.set(id, billItem);
+    const [billItem] = await db.insert(billItems).values(insertBillItem).returning();
     return billItem;
+  }
+
+  async getDailyTotal(date: string): Promise<number> {
+    const result = await db
+      .select({ total: sql<number>`COALESCE(SUM(${bills.totalAmount}), 0)` })
+      .from(bills)
+      .where(eq(bills.billDate, date));
+    return result[0]?.total || 0;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
