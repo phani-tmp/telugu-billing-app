@@ -5,21 +5,15 @@
             "src": "package.json",
             "use": "@vercel/node",
             "config": {
-                "buildCommand": "cd client && vite build && cd .. && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
+                "buildCommand": "npm install && npm run build:client",
+                "outputDirectory": "client/dist"
             }
         }
     ],
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "dist/index.js",
-            "methods": [
-                "GET",
-                "POST",
-                "PUT",
-                "DELETE",
-                "PATCH"
-            ]
+            "dest": "https://telugu-billing-app.onrender.com/api/$1"
         },
         {
             "src": "/(.*)",
